@@ -1,0 +1,59 @@
+pipeline {
+    
+    agent any
+    
+    tools {
+        maven 'Maven3'
+    }
+    
+    environment {
+        registry = "185592412460.dkr.ecr.ap-southeast-1.amazonaws.com/nginx-demo-205"
+    }
+    
+    stages {
+        
+        stage('CheckOut') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Mckaty/challenges']]])
+            }
+        }
+        
+        stage('Build image') {
+            steps{
+                script {
+                    sh "whoami"
+                    sh "pwd"
+                    dir('ci-cd-pipeline') {
+                        sh "pwd"
+                        sh "docker build -t nginx-demo-205 ."
+                    }
+                }
+             }
+        }
+        
+        stage('Push to ECR') {
+            steps{  
+                script {
+                    sh "whoami"    
+                    sh 'aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 185592412460.dkr.ecr.ap-southeast-1.amazonaws.com'
+                    sh 'docker tag nginx-demo-205:latest 185592412460.dkr.ecr.ap-southeast-1.amazonaws.com/nginx-demo-205:latest'
+                    sh 'docker push 185592412460.dkr.ecr.ap-southeast-1.amazonaws.com/nginx-demo-205:latest' 
+                }
+            }
+        }
+        
+        stage('Deploy to EKS') {
+            steps{
+                script {
+                    dir('ci-cd-pipeline') {
+                        sh 'whoami'
+                        sh 'pwd'
+                        sh 'kubectl apply -f eks-deploy-ecr-nginx-demo-205-k8s.yaml' 
+                    }
+                }
+            }
+        }
+        
+    }
+        
+}
